@@ -1,4 +1,4 @@
-package pr8;
+package pr008;
 
 /**
  * Created with IntelliJ IDEA. User: Danie Date: 11/4/12 Time: 10:35 PM To change this template use File | Settings |

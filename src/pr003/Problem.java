@@ -1,4 +1,4 @@
-package pr3;
+package pr003;
 
 import java.math.BigDecimal;
 import java.text.DecimalFormat;

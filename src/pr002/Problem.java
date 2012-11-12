@@ -1,4 +1,4 @@
-package pr2;
+package pr002;
 
 import java.math.BigDecimal;
 

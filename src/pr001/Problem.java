@@ -1,4 +1,4 @@
-package pr1;
+package pr001;
 
 /**
  * Created with IntelliJ IDEA. User: Daniel Date: 11/3/12 Time: 7:55 PM * ==================== * This is an
@@ -38,7 +38,7 @@ public class Problem {
 
     public static void main(String[] args) {
 
-        pr1.Problem pr1 = new pr1.Problem(1000, new int[]{3, 5});
+        pr001.Problem pr1 = new pr001.Problem(1000, new int[]{3, 5});
         System.out.println("Multiple addition:");
         System.out.println(pr1.Calculate());
 
