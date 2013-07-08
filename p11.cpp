@@ -33,6 +33,11 @@
     What is the greatest product of four adjacent numbers in the same direction (up, down, left, right, or diagonally) in the 20×20 grid?
     ///////////////////////
 
+    Exit Errors:
+    -3      -       Dimensions do not fit the provided data.
+    -4      -       Thread Joining error
+
+
  */
 
 //System Libraries
@@ -43,21 +48,43 @@
 #include <sstream>
 #include <cstdlib>
 
+//Computation Types
+enum computationTypes {VERTICAL, HORIZONTAL, FORWARD_DIAGONAL, BACKWARDS_DIAGONAL};
+
+//Threading
+#include <pthread.h>
+static const unsigned int NUM_THREADS = 4;
+
 int **numbers;
 std::ifstream inFile;
 
+struct multiplicationThreads
+{
+    int thread_id;
+    int processResult;
+    computationTypes processType;
+    int *dimensions;
+    int **numbers;
+
+};
+
 //It has been defined in the problem that the input array is 20x20. THis can be assumed constant throughout the lifespan of the program
 const unsigned int GRID_SIZE = 20;
+const unsigned int MULTIPLICATION_LENGTH = 4;   //Number of consecutive numbers to multiply
 
-const bool TEST_READ_FILE = false;
-const bool TEST_GET_DIMS = true;
-const bool TEST_READ_DATA_IN = true;
+//Test-toggles
+const bool TEST_ENABLE_ALL = false;
+const bool TEST_READ_FILE = false && TEST_ENABLE_ALL;
+const bool TEST_GET_DIMS = true && TEST_ENABLE_ALL;
+const bool TEST_READ_DATA_IN = true && TEST_ENABLE_ALL;
+const bool TEST_DISPLAY_THREAD_OUTPUTS = true && TEST_ENABLE_ALL;
 
 //Indexing Constants
 const unsigned int WIDTH = 0;
 const unsigned int HEIGHT = 1;
 //Prototype Methods
 int *getDim(std::ifstream *file);
+void *ComputeProducts(void *threadArg);  //Multithread calculator
 
 //Program Entry
 int main(int argc, char const *argv[])
@@ -95,7 +122,7 @@ int main(int argc, char const *argv[])
                 while (stream.good())
                 {
                     stream >> x;
-                    std::cout << std::setw(3) << x;
+                    //std::cout << std::setw(3) << x;
                 }
 
             }
@@ -147,26 +174,80 @@ int main(int argc, char const *argv[])
             stream >> numbers[i_fill][j_fill];
             if (TEST_READ_DATA_IN)
             {
-                std::cout << "Reading Position (" << i_fill << ", " << j_fill << ") with " << numbers[i_fill][j_fill] << std::endl;
+                std::cout << "Reading Position (" << j_fill << ", " << i_fill << ") with " << numbers[i_fill][j_fill] << std::endl;
             }
-            j_fill++;
+            i_fill++;
         }
-        j_fill = 0;
-        i_fill++;
+        i_fill = 0;
+        j_fill++;
 
     }
 
     //Close the file once all reading is complete
     inFile.close();
 
+    //At this stage it would probably be a good idea to check if the size of multiplication requested is allowable given the input dimensions
+    if (MULTIPLICATION_LENGTH > std::min(dimensions[WIDTH], dimensions[HEIGHT]))
+    {
+        std::cerr << "The multiplication size will not fit within the provided data.";
+        exit(-3);
+    }
+
     //Compute the maximum products in four different directions;
     //  -Vertically
     //  -Horizontally
     //  -Right Diagonal
     //  -Left Diagonal
-    //  
+    //
     //  Using a multi-threaded approach, we can condense the processing time, however, IOPS may be increased.
 
+    //Create locations for the thread information
+    struct multiplicationThreads mtData[NUM_THREADS];
+
+    //Initialise the thread data
+    for (int i = 0; i < NUM_THREADS; i++)
+    {
+        mtData[i].processResult = 0;
+        mtData[i].processType = (computationTypes)i;
+        mtData[i].thread_id = i;
+        mtData[i].dimensions = dimensions;
+        mtData[i].numbers = numbers;
+    }
+
+    //Create an addressable space for thread locations
+    pthread_t threads[NUM_THREADS];
+    std::cout << "Computing Data" << std::endl;
+    for (int i = 0; i < 4; i++)
+    {
+        std::cout << "Creating Thread " << i << std::endl;;
+        pthread_create(&threads[i], NULL, ComputeProducts, (void *)&mtData[i]);
+    }
+
+    //Wait for executing threads to finish before consolidating
+    void *status;
+    int rc;
+    for (int i = 0; i < NUM_THREADS; i++)
+    {
+        rc = pthread_join(threads[i], &status);
+        if (rc)
+        {
+            std::cerr << "Error joining thread." << rc << std::endl;
+            exit(-4);
+        }
+
+        std::cout << "Thread " << mtData[i].thread_id << " Completed" << std::endl;
+    }
+    std::cerr << "Threads completed Running" << std::endl;
+
+    //Consolidate and reduce the thread outputs
+    if (TEST_DISPLAY_THREAD_OUTPUTS)
+    {
+        for (int i = 0; i < NUM_THREADS; i++)
+        {
+            std::cout << "Thread " << mtData[i].thread_id << " Produced " << mtData[i].processResult << std::endl;
+        }
+
+    }
 
     return 0;
 }
@@ -229,3 +310,125 @@ int *getDim(std::ifstream *file)
     return returnArr;
 
 }
+
+void *ComputeProducts(void *threadArg)
+{
+    //We must specify the field in which the calculations will start
+    int ends[4];        //{i_starrt, i_end, j_start, j_end}
+    int tempProd;
+
+
+    //Retrieve the thread data
+    struct multiplicationThreads *myData;
+    myData = (struct multiplicationThreads *) threadArg;
+
+    switch (myData->processType)
+    {
+    case VERTICAL:
+        //Define the range in which calculations will occour
+        ends[0] = 0;
+        ends[1] = myData->dimensions[WIDTH];
+        ends[2] = 0;
+        ends[3] = myData->dimensions[HEIGHT] - MULTIPLICATION_LENGTH ;
+
+        //Compute the product
+        for (int i = ends[0]; i < ends[1]; i++)
+        {
+            for (int j = ends[2]; j < ends[3]; j++)
+            {
+                tempProd = 1;   //Create the indentity multiple
+                for (int m = 0; m < MULTIPLICATION_LENGTH; m++)
+                {
+                    tempProd *= myData->numbers[i][j + m];
+                }
+
+                if (tempProd > myData->processResult)
+                {
+                    myData->processResult = tempProd;
+                }
+            }
+        }
+        break;
+    case HORIZONTAL:
+        ends[0] = 0;
+        ends[1] = myData->dimensions[WIDTH] - MULTIPLICATION_LENGTH;
+        ends[2] = 0;
+        ends[3] = myData->dimensions[HEIGHT];
+
+        //Compute the product
+
+        for (int i = ends[0]; i < ends[1]; i++)
+        {
+            for (int j = ends[2]; j < ends[3]; j++)
+            {
+                tempProd = 1;   //Create the indentity multiple
+                for (int m = 0; m < MULTIPLICATION_LENGTH; m++)
+                {
+                    tempProd *= myData->numbers[i + m][j];
+                }
+
+                if (tempProd > myData->processResult)
+                {
+                    myData->processResult = tempProd;
+                }
+            }
+        }
+        break;
+    case FORWARD_DIAGONAL:
+        ends[0] = 0;
+        ends[1] = myData->dimensions[HEIGHT] - MULTIPLICATION_LENGTH ;
+        ends[2] = 0;
+        ends[3] = myData->dimensions[WIDTH] - MULTIPLICATION_LENGTH ;
+        //Compute the product
+
+        for (int i = ends[0]; i < ends[1]; i++)
+        {
+            for (int j = ends[2]; j < ends[3]; j++)
+            {
+                tempProd = 1;   //Create the indentity multiple
+                for (int m = 0; m < MULTIPLICATION_LENGTH; m++)
+                {
+                    tempProd = tempProd * myData->numbers[i + m][j + m];
+
+                }
+
+                if (tempProd > myData->processResult)
+                {
+                    myData->processResult = tempProd;
+                }
+            }
+        }
+        break;
+    case BACKWARDS_DIAGONAL:
+        ends[0] = MULTIPLICATION_LENGTH - 1;
+        ends[1] = myData->dimensions[HEIGHT];
+        ends[2] = MULTIPLICATION_LENGTH - 1;
+        ends[3] = myData->dimensions[WIDTH];
+        //Compute the product
+
+        for (int i = ends[0]; i < ends[1]; i++)
+        {
+            for (int j = ends[2]; j < ends[3]; j++)
+            {
+                tempProd = 1;   //Create the indentity multiple
+                for (int m = 0; m < MULTIPLICATION_LENGTH; m++)
+                {
+                    tempProd *= myData->numbers[i - m][j - m];
+
+                }
+
+                if (tempProd > myData->processResult)
+                {
+                    myData->processResult = tempProd;
+                }
+            }
+        }
+        break;
+    default:
+        std::cerr << "Error in processing the products";
+        break;
+    }
+    pthread_exit(NULL);
+
+}
+
