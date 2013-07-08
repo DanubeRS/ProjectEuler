@@ -124,9 +124,7 @@ int main(int argc, char const *argv[])
                     stream >> x;
                     //std::cout << std::setw(3) << x;
                 }
-
             }
-
             std::cout << std::endl;
         }
     }
@@ -142,11 +140,8 @@ int main(int argc, char const *argv[])
     {
         if (TEST_GET_DIMS)
         {
-
-
             std::cout << "Width: " << dimensions[WIDTH] << std::endl << "Height: " << dimensions[HEIGHT] << std::endl;
         }
-
     }
 
 
@@ -174,7 +169,7 @@ int main(int argc, char const *argv[])
             stream >> numbers[i_fill][j_fill];
             if (TEST_READ_DATA_IN)
             {
-                std::cout << "Reading Position (" << j_fill << ", " << i_fill << ") with " << numbers[i_fill][j_fill] << std::endl;
+                std::cout << "Reading Position (" << i_fill << ", " << j_fill << ") with " << numbers[i_fill][j_fill] << std::endl;
             }
             i_fill++;
         }
@@ -235,7 +230,7 @@ int main(int argc, char const *argv[])
             exit(-4);
         }
 
-        std::cout << "Thread " << mtData[i].thread_id << " Completed" << std::endl;
+        std::cout << "Thread " << mtData[i].thread_id << " Completed with result " << mtData[i].processResult << std::endl;
     }
     std::cerr << "Threads completed Running" << std::endl;
 
@@ -248,6 +243,16 @@ int main(int argc, char const *argv[])
         }
 
     }
+
+    int consolidateMax = 0;
+    for (int i = 0; i < NUM_THREADS; i++)
+    {
+        consolidateMax = std::max(consolidateMax, mtData[i].processResult);
+    }
+
+    std::cout << "The Maximum Product is: " << consolidateMax << std::endl;
+
+
 
     return 0;
 }
@@ -341,7 +346,6 @@ void *ComputeProducts(void *threadArg)
                 {
                     tempProd *= myData->numbers[i][j + m];
                 }
-
                 if (tempProd > myData->processResult)
                 {
                     myData->processResult = tempProd;
@@ -376,11 +380,11 @@ void *ComputeProducts(void *threadArg)
         break;
     case FORWARD_DIAGONAL:
         ends[0] = 0;
-        ends[1] = myData->dimensions[HEIGHT] - MULTIPLICATION_LENGTH ;
+        ends[1] = myData->dimensions[HEIGHT] - MULTIPLICATION_LENGTH;
         ends[2] = 0;
-        ends[3] = myData->dimensions[WIDTH] - MULTIPLICATION_LENGTH ;
-        //Compute the product
+        ends[3] = myData->dimensions[WIDTH] - MULTIPLICATION_LENGTH;
 
+        //Compute the product
         for (int i = ends[0]; i < ends[1]; i++)
         {
             for (int j = ends[2]; j < ends[3]; j++)
@@ -389,7 +393,6 @@ void *ComputeProducts(void *threadArg)
                 for (int m = 0; m < MULTIPLICATION_LENGTH; m++)
                 {
                     tempProd = tempProd * myData->numbers[i + m][j + m];
-
                 }
 
                 if (tempProd > myData->processResult)
@@ -399,11 +402,12 @@ void *ComputeProducts(void *threadArg)
             }
         }
         break;
+
     case BACKWARDS_DIAGONAL:
         ends[0] = MULTIPLICATION_LENGTH - 1;
         ends[1] = myData->dimensions[HEIGHT];
-        ends[2] = MULTIPLICATION_LENGTH - 1;
-        ends[3] = myData->dimensions[WIDTH];
+        ends[2] = 0;
+        ends[3] = myData->dimensions[WIDTH] - MULTIPLICATION_LENGTH;
         //Compute the product
 
         for (int i = ends[0]; i < ends[1]; i++)
@@ -413,7 +417,7 @@ void *ComputeProducts(void *threadArg)
                 tempProd = 1;   //Create the indentity multiple
                 for (int m = 0; m < MULTIPLICATION_LENGTH; m++)
                 {
-                    tempProd *= myData->numbers[i - m][j - m];
+                    tempProd *= myData->numbers[i - m][j + m];
 
                 }
 
